@@ -19,6 +19,8 @@ import numpy as np
 
 from .settings import AppSettings
 
+cv2.setUseOptimized(True)
+
 
 class EngineState(Enum):
     RECORDING = auto()

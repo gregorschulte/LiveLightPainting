@@ -1,13 +1,13 @@
 {
   "camera_index": 0,
-  "framerate": 30,
+  "framerate": 10,
   "exposure_auto": true,
   "exposure": -6.0,
   "record_interval": 30.0,
   "hold_interval": 10.0,
   "save_enabled": true,
   "save_folder": "paintings",
-  "threshold": 9,
+  "threshold": 242,
   "mirror": true,
   "blend_mode": "maximum"
 }

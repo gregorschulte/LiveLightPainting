@@ -60,9 +60,8 @@ def test_engine() -> None:
     print("engine tests OK")
 
 
-def test_gui_demo() -> None:
+def test_gui_demo(app) -> None:
     from PySide6.QtCore import QTimer
-    from PySide6.QtWidgets import QApplication
 
     from app.main_window import MainWindow
 
@@ -75,7 +74,6 @@ def test_gui_demo() -> None:
         framerate=20,
         threshold=50,
     )
-    app = QApplication([])
     window = MainWindow(settings, demo=True)
     window.show()
     QTimer.singleShot(6000, app.quit)  # run ~2 full rounds, then quit
@@ -88,9 +86,52 @@ def test_gui_demo() -> None:
         "saved painting is empty or unreadable"
     )
     print(f"GUI smoke test OK - saved painting: {files[0]}")
+    window.close()
+    window.worker.wait(2000)
+
+
+def test_render_performance(app) -> None:
+    """Frame hand-off to the view must stay well within a frame budget."""
+    from app.main_window import MainWindow
+
+    window = MainWindow(AppSettings(), demo=True)
+    window.show()
+    window.resize(1920, 1080)  # simulate fullscreen
+    window.worker.stop()
+    window.worker.wait(2000)
+
+    frame = np.random.randint(0, 255, (720, 1280, 3), dtype=np.uint8)
+    window._show_frame(frame, "test")  # warm-up (GL init happens here)
+    start = time.perf_counter()
+    for _ in range(30):
+        window._show_frame(frame, "test")
+    per_frame_ms = (time.perf_counter() - start) / 30 * 1000
+    assert per_frame_ms < 33, f"rendering too slow: {per_frame_ms:.1f} ms/frame"
+    mode = "OpenGL" if window._use_gl else "software fallback"
+    print(f"render performance OK - {per_frame_ms:.1f} ms/frame ({mode})")
+    window.close()
+
+
+def test_settings_dialog_opens_instantly(app) -> None:
+    """Constructing the dialog must not block on camera enumeration."""
+    from app.settings_dialog import SettingsDialog
+
+    start = time.perf_counter()
+    dialog = SettingsDialog(AppSettings())
+    elapsed = time.perf_counter() - start
+    assert elapsed < 1.0, f"dialog blocked for {elapsed:.2f} s"
+    dialog.apply_to(AppSettings())  # must not crash while scan is running
+    dialog._scanner.wait(5000)
+    dialog.close()
+    print(f"settings dialog OK - constructed in {elapsed * 1000:.0f} ms")
 
 
 if __name__ == "__main__":
+    from PySide6.QtWidgets import QApplication
+
     test_engine()
-    test_gui_demo()
+    app = QApplication([])  # one QApplication shared by all GUI tests
+    test_gui_demo(app)
+    test_render_performance(app)
+    test_settings_dialog_opens_instantly(app)
     print("All smoke tests passed.")

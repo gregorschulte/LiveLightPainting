@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import sys
 
+from PySide6.QtGui import QSurfaceFormat
 from PySide6.QtWidgets import QApplication
 
 from app.main_window import MainWindow
@@ -31,6 +32,13 @@ def main() -> int:
     args = parser.parse_args()
 
     settings = load_settings()
+
+    # Request a vsynced GL surface before creating the app.
+    # (Qt6 surfaces are always double-buffered; there is no setDoubleBuffer.)
+    fmt = QSurfaceFormat()
+    fmt.setSwapInterval(1)  # vsync - smooth, tear-free fullscreen
+    QSurfaceFormat.setDefaultFormat(fmt)
+
     app = QApplication(sys.argv)
     window = MainWindow(settings, demo=args.demo)
     if args.fullscreen:

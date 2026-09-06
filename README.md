@@ -11,6 +11,10 @@ into an accumulator (running maximum), so light "burns into" the image while
 the dark room stays dark. A brightness threshold suppresses sensor noise and
 ambient light.
 
+Rendering is GPU-accelerated (OpenGL), so fullscreen stays smooth even at high
+resolutions; if OpenGL is unavailable the app automatically falls back to a
+software renderer.
+
 ## Installation (Windows & Linux)
 
 ```bash
@@ -71,7 +75,8 @@ main.py                  entry point
 app/settings.py          settings dataclass + JSON persistence
 app/painting_engine.py   light accumulation + round state machine
 app/camera_worker.py     capture thread (+ demo source), camera enumeration
-app/main_window.py       live view, progress bar, hotkeys, saving
+app/video_view.py        OpenGL-accelerated live view (GPU rendering)
+app/main_window.py       main window, progress bar, hotkeys, saving
 app/settings_dialog.py   settings UI
 paintings/               saved results
 ```

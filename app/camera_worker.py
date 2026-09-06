@@ -30,6 +30,15 @@ def enumerate_cameras(max_index: int = 5) -> list[int]:
     return found
 
 
+class CameraScanThread(QThread):
+    """Enumerate cameras in the background so the GUI never blocks."""
+
+    finished_scan = Signal(list)  # list[int]
+
+    def run(self) -> None:
+        self.finished_scan.emit(enumerate_cameras())
+
+
 class CameraWorker(QThread):
     """Continuously grabs frames and emits them as `frame_ready(np.ndarray)`."""
 

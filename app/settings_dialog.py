@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 
-from .camera_worker import enumerate_cameras
+from .camera_worker import CameraScanThread
 from .settings import AppSettings
 
 BLEND_MODES = ["maximum", "add", "screen"]
@@ -31,21 +31,24 @@ class SettingsDialog(QDialog):
 
     def __init__(self, settings: AppSettings, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self.settings = settings
         self.setWindowTitle("Settings")
         self.setMinimumWidth(420)
 
         form = QFormLayout()
 
         # --- camera selection -------------------------------------------
+        # Probing cameras can take seconds (and may block while a camera is
+        # in use), so it runs in a background thread; the dialog opens
+        # instantly with the currently configured camera pre-selected.
         self.camera_combo = QComboBox()
-        cameras = enumerate_cameras()
-        if settings.camera_index not in cameras:
-            cameras.append(settings.camera_index)
-        for index in sorted(cameras):
-            self.camera_combo.addItem(f"Camera {index}", userData=index)
-        self.camera_combo.setCurrentIndex(
-            self.camera_combo.findData(settings.camera_index)
+        self.camera_combo.addItem(
+            f"Camera {settings.camera_index}", userData=settings.camera_index
         )
+        self.camera_combo.addItem("Scanning…", userData=None)
+        self._scanner = CameraScanThread(self)
+        self._scanner.finished_scan.connect(self._on_cameras_scanned)
+        self._scanner.start()
         form.addRow("Webcam", self.camera_combo)
 
         # --- framerate ---------------------------------------------------
@@ -141,6 +144,16 @@ class SettingsDialog(QDialog):
         layout.addWidget(buttons)
 
     # ------------------------------------------------------------------ #
+    def _on_cameras_scanned(self, cameras: list[int]) -> None:
+        """Populate the webcam dropdown once the background scan finished."""
+        current = self.settings.camera_index
+        if current not in cameras:
+            cameras = sorted(cameras + [current])
+        self.camera_combo.clear()
+        for index in cameras:
+            self.camera_combo.addItem(f"Camera {index}", userData=index)
+        self.camera_combo.setCurrentIndex(self.camera_combo.findData(current))
+
     def _browse_folder(self) -> None:
         folder = QFileDialog.getExistingDirectory(self, "Select save folder")
         if folder:
@@ -148,7 +161,9 @@ class SettingsDialog(QDialog):
 
     def apply_to(self, settings: AppSettings) -> None:
         """Write the dialog values into the given settings object."""
-        settings.camera_index = self.camera_combo.currentData()
+        camera_index = self.camera_combo.currentData()
+        if camera_index is not None:  # scan may still be running
+            settings.camera_index = camera_index
         settings.framerate = self.fps_spin.value()
         settings.exposure_auto = self.exposure_auto_check.isChecked()
         settings.exposure = self.exposure_spin.value()
